@@ -4469,6 +4469,12 @@ main_menu() {
     done
 }
 
+is_root()
+{
+    [[ $(id -u) = 0 ]] && return 0
+    return 1
+}
+
 # END OF FUNCTIONS
 
 if [[ $SBOPKG_DEBUG ]]; then
@@ -4532,12 +4538,7 @@ DIAG=1
 ON_ERROR=ask
 REPOS_FIELDS=7
 PIDFILE=/var/run/sbopkg.pid
-
-# Make sure we are root.
-if [[ $(id -u) != 0 ]]; then
-    echo "$SCRIPT: $SCRIPT must be run by the root user.  Exiting." >&2
-    exit 1
-fi
+ROOTREQ=0
 
 # Set up ARCH - borrowed from SBo SlackBuild template
 # Automatically determine the architecture we're building on:
@@ -4566,6 +4567,7 @@ while getopts ":b:BcD:d:e:f:g:hi:kloPpqRrs:uV:v" OPT; do
             set_type build
             BUILDLIST+=("$OPTARG")
             unset DIAG
+            ROOTREQ=1
             ;;
         B ) # Bulk process without confirmation
             BULK=1
@@ -4577,6 +4579,7 @@ while getopts ":b:BcD:d:e:f:g:hi:kloPpqRrs:uV:v" OPT; do
             ;;
         D ) # Location of the local SBo repository
             REPO_ROOT=$OPTARG
+            ROOTREQ=1
             ;;
         d ) # Download
             set_type download
@@ -4598,6 +4601,7 @@ while getopts ":b:BcD:d:e:f:g:hi:kloPpqRrs:uV:v" OPT; do
             set_type install
             BUILDLIST+=("$OPTARG")
             unset DIAG
+            ROOTREQ=1
             ;;
         k ) # Skip installed packages
             SKIP_INSTALLED=1
@@ -4630,10 +4634,12 @@ while getopts ":b:BcD:d:e:f:g:hi:kloPpqRrs:uV:v" OPT; do
         r ) # Sync with the remote repository
             SYNC=1
             unset DIAG
+            ROOTREQ=1
             ;;
         s ) # Name search
             SEARCH+=("$OPTARG")
             unset DIAG
+            ROOTREQ=1
             ;;
         u ) # Search an updated sbopkg package
             UPDATE=1
@@ -4642,6 +4648,7 @@ while getopts ":b:BcD:d:e:f:g:hi:kloPpqRrs:uV:v" OPT; do
         V ) # Set repository
             VERSION=1
             CUSTOMVER="$OPTARG"
+            ROOTREQ=1
             ;;
         v ) # print version
             echo $SBOVER
@@ -4759,6 +4766,16 @@ if ! set_repo_vars; then
     echo "Unknown repository name -- \"$CUSTOMVER\"" >&2
     list_repos
     exit 1
+fi
+
+if ! is_root; then
+    # Make sure we are root when we need to
+    if [[ $ROOTREQ -ne 0 ]]; then
+      echo "$SCRIPT: $SCRIPT must be run by the root user.  Exiting." >&2
+      exit 1
+    fi
+    # all user actions are already performed
+    exit 0
 fi
 
 # Check for required directories
